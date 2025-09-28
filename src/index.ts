@@ -2,13 +2,16 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
-import rateLimit from 'express-rate-limit';
+// import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 import mongoose from 'mongoose';
 
 // Import routes - Only analytics for Ojitha's responsibilities
 import analyticsRoutes from './routes/analytics.routes';
 import outletRoutes from './routes/outlet.routes';
+import customerRoutes from './routes/customer.routes';
+import queueRoutes from './routes/queue.routes';
+import servicesRoutes from './routes/services.routes';
 
 // Import middleware
 import { errorHandler } from './middleware/errorHandler';
@@ -19,20 +22,33 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000'), // 15 minutes
-  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100'), // limit each IP to 100 requests per windowMs
-  message: 'Too many requests from this IP, please try again later.'
-});
+// Rate limiting - More lenient for development (disabled for now)
+// const limiter = rateLimit({
+//   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '60000'),
+//   max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '1000'),
+//   message: {
+//     success: false,
+//     message: 'Too many requests from this IP, please try again later.',
+//     retryAfter: 60
+//   },
+//   standardHeaders: true,
+//   legacyHeaders: false,
+// });
 
 // Middleware
 app.use(helmet());
 app.use(compression());
-app.use(limiter);
+// app.use(limiter); // Disabled for development
 app.use(cors({
-  origin: process.env.FRONTEND_URL || "http://localhost:3000",
-  credentials: true
+  origin: [
+    process.env.FRONTEND_URL || "http://localhost:3000",
+    "http://localhost:5173",
+    "http://localhost:5174",
+    "http://localhost:3000"
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -75,6 +91,9 @@ app.post('/api/seed', async (_req, res) => {
 // API Routes - Only analytics and outlets for Ojitha's tasks
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/outlets', outletRoutes);
+app.use('/api/customer', customerRoutes);
+app.use('/api/queue', queueRoutes);
+app.use('/api/services', servicesRoutes);
 
 // Error handling middleware (should be last)
 app.use(errorHandler);
@@ -87,19 +106,52 @@ app.use('*', (_req, res) => {
   });
 });
 
-// Database connection
+// Database connection with better fallback
 const connectDB = async () => {
   try {
     const mongoURI = process.env.MONGODB_URI;
-    if (!mongoURI) {
-      throw new Error('MONGODB_URI is not defined in environment variables');
+    const localURI = process.env.MONGODB_LOCAL_URI || 'mongodb://localhost:27017/queueManagement';
+    
+    // Try local MongoDB first for development
+    if (process.env.NODE_ENV === 'development') {
+      try {
+        await mongoose.connect(localURI, {
+          serverSelectionTimeoutMS: 5000, // Timeout after 5s instead of 30s
+        });
+        console.log('✅ Connected to local MongoDB');
+        return;
+      } catch (localError) {
+        console.log('⚠️  Local MongoDB not available, trying Atlas...');
+      }
     }
-
-    await mongoose.connect(mongoURI);
-    console.log('✅ Connected to MongoDB Atlas');
+    
+    // Try Atlas connection
+    if (mongoURI) {
+      try {
+        await mongoose.connect(mongoURI, {
+          serverSelectionTimeoutMS: 10000, // Timeout after 10s
+        });
+        console.log('✅ Connected to MongoDB Atlas');
+        return;
+      } catch (atlasError) {
+        console.error('❌ MongoDB Atlas connection error:', atlasError);
+      }
+    }
+    
+    // If both fail, try local again as final fallback
+    try {
+      await mongoose.connect(localURI, {
+        serverSelectionTimeoutMS: 5000,
+      });
+      console.log('✅ Connected to local MongoDB (fallback)');
+    } catch (finalError) {
+      console.error('❌ All MongoDB connection attempts failed');
+      console.log('💡 Please ensure MongoDB is running locally or check Atlas connection');
+      // Don't exit - let the server run without DB for testing API structure
+      console.log('🚀 Starting server without database connection...');
+    }
   } catch (error) {
-    console.error('❌ MongoDB connection error:', error);
-    process.exit(1);
+    console.error('❌ Database connection setup error:', error);
   }
 };
 
