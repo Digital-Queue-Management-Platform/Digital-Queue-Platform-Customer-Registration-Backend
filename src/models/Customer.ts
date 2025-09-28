@@ -110,3 +110,4 @@ customerSchema.index({ registrationTime: 1 });
 customerSchema.index({ phoneNumber: 1 });
 
 export const Customer = mongoose.model<ICustomer>('Customer', customerSchema);
+/*Test*/
