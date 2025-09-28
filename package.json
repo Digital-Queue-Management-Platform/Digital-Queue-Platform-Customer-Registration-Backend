@@ -8,7 +8,6 @@
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "build": "npm run clean && tsc",
     "clean": "rimraf dist",
-    "postinstall": "npm run build",
     "test": "jest",
     "lint": "eslint src/**/*.ts",
     "lint:fix": "eslint src/**/*.ts --fix"
