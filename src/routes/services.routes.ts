@@ -69,17 +69,33 @@ router.get('/types', async (_req, res) => {
         .select('id name description estimatedDuration category isActive')
         .sort({ name: 1 });
 
+      // Transform data to match frontend expectations
+      const transformedNewTypes = newServiceTypes.map(service => ({
+        id: service.id,
+        name: service.name,
+        estimatedTime: Math.round(service.estimatedDuration / 60), // Convert seconds to minutes
+        category: service.category
+      }));
+
       return res.json({
         success: true,
-        data: newServiceTypes,
-        totalCount: newServiceTypes.length
+        data: transformedNewTypes,
+        totalCount: transformedNewTypes.length
       });
     }
 
+    // Transform data to match frontend expectations
+    const transformedTypes = serviceTypes.map(service => ({
+      id: service.id,
+      name: service.name,
+      estimatedTime: Math.round(service.estimatedDuration / 60), // Convert seconds to minutes
+      category: service.category
+    }));
+
     res.json({
       success: true,
-      data: serviceTypes,
-      totalCount: serviceTypes.length
+      data: transformedTypes,
+      totalCount: transformedTypes.length
     });
   } catch (error) {
     console.error('Error fetching service types:', error);
