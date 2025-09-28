@@ -5,7 +5,6 @@
 [![MongoDB](https://img.shields.io/badge/MongoDB-Atlas-green.svg)](https://www.mongodb.com/)
 [![Express.js](https://img.shields.io/badge/Express.js-4.18+-orange.svg)](https://expressjs.com/)
 [![Deployed](https://img.shields.io/badge/Deployed-Render-46E3B7.svg)](https://digital-queue-platform-customer.onrender.com)
-[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 > **Production-Ready RESTful API** for Digital Queue Management Platform with Analytics & Real-time Processing
 
