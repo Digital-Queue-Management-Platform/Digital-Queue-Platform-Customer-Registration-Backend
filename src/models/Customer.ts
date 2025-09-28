@@ -7,15 +7,16 @@ export interface ICustomer extends Document {
   serviceType: string;
   priority: 'normal' | 'vip' | 'disabled' | 'senior';
   tokenNumber: string;
-  qrCode: string;
-  outletId: mongoose.Types.ObjectId;
+  qrCode?: string;
+  outletId: string;
   status: 'waiting' | 'being_served' | 'completed' | 'cancelled';
   registrationTime: Date;
+  queuePosition: number;
   estimatedWaitTime: number;
   actualWaitTime?: number;
   serviceStartTime?: Date;
   serviceEndTime?: Date;
-  assignedOfficerId?: mongoose.Types.ObjectId;
+  assignedOfficerId?: string;
   feedback?: {
     rating: number;
     comment?: string;
@@ -55,11 +56,9 @@ const customerSchema = new Schema<ICustomer>({
   },
   qrCode: {
     type: String,
-    required: true,
   },
   outletId: {
-    type: Schema.Types.ObjectId,
-    ref: 'Outlet',
+    type: String,
     required: true,
   },
   status: {
@@ -70,6 +69,10 @@ const customerSchema = new Schema<ICustomer>({
   registrationTime: {
     type: Date,
     default: Date.now,
+  },
+  queuePosition: {
+    type: Number,
+    required: true,
   },
   estimatedWaitTime: {
     type: Number,
@@ -85,8 +88,7 @@ const customerSchema = new Schema<ICustomer>({
     type: Date,
   },
   assignedOfficerId: {
-    type: Schema.Types.ObjectId,
-    ref: 'Officer',
+    type: String,
   },
   feedback: {
     rating: {
