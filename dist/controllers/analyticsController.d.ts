@@ -5,11 +5,11 @@ export declare class AnalyticsController {
     /**
      * Get comprehensive analytics dashboard data
      */
-    getDashboard: (req: Request, res: Response) => Promise<void>;
+    getDashboard: (req: Request, res: Response) => Promise<any>;
     /**
      * Get wait time analytics
      */
-    getWaitTimes: (req: Request, res: Response) => Promise<void>;
+    getWaitTimes: (req: Request, res: Response) => Promise<any>;
     /**
      * Get service type distribution analytics
      */
@@ -17,7 +17,7 @@ export declare class AnalyticsController {
     /**
      * Get officer performance analytics
      */
-    getOfficerPerformance: (req: Request, res: Response) => Promise<void>;
+    getOfficerPerformance: (req: Request, res: Response) => Promise<any>;
     /**
      * Get outlet comparison analytics
      */

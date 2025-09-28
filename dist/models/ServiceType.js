@@ -33,90 +33,44 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.Customer = void 0;
+exports.ServiceType = void 0;
 const mongoose_1 = __importStar(require("mongoose"));
-const customerSchema = new mongoose_1.Schema({
+const serviceTypeSchema = new mongoose_1.Schema({
+    id: {
+        type: String,
+        required: true,
+        unique: true,
+    },
     name: {
         type: String,
         required: true,
         trim: true,
     },
-    phoneNumber: {
-        type: String,
-        required: true,
-        trim: true,
-    },
-    email: {
-        type: String,
-        trim: true,
-        lowercase: true,
-    },
-    serviceType: {
+    description: {
         type: String,
         required: true,
     },
-    priority: {
-        type: String,
-        enum: ['normal', 'vip', 'disabled', 'senior'],
-        default: 'normal',
-    },
-    tokenNumber: {
-        type: String,
-        required: true,
-        unique: true,
-    },
-    qrCode: {
-        type: String,
-    },
-    outletId: {
-        type: String,
-        required: true,
-    },
-    status: {
-        type: String,
-        enum: ['waiting', 'being_served', 'completed', 'cancelled'],
-        default: 'waiting',
-    },
-    registrationTime: {
-        type: Date,
-        default: Date.now,
-    },
-    queuePosition: {
+    estimatedDuration: {
         type: Number,
         required: true,
+        min: 60, // minimum 1 minute
     },
-    estimatedWaitTime: {
-        type: Number,
+    category: {
+        type: String,
         required: true,
     },
-    actualWaitTime: {
-        type: Number,
+    isActive: {
+        type: Boolean,
+        default: true,
     },
-    serviceStartTime: {
-        type: Date,
-    },
-    serviceEndTime: {
-        type: Date,
-    },
-    assignedOfficerId: {
-        type: String,
-    },
-    feedback: {
-        rating: {
-            type: Number,
-            min: 1,
-            max: 5,
-        },
-        comment: String,
-        submittedAt: Date,
-    },
+    requirements: [{
+            type: String,
+        }],
 }, {
     timestamps: true,
 });
-// Indexes for performance
-customerSchema.index({ outletId: 1, status: 1 });
-customerSchema.index({ tokenNumber: 1 });
-customerSchema.index({ registrationTime: 1 });
-customerSchema.index({ phoneNumber: 1 });
-exports.Customer = mongoose_1.default.model('Customer', customerSchema);
-//# sourceMappingURL=Customer.js.map
+// Indexes
+serviceTypeSchema.index({ isActive: 1 });
+serviceTypeSchema.index({ category: 1 });
+exports.ServiceType = mongoose_1.default.model('ServiceType', serviceTypeSchema);
+//# sourceMappingURL=ServiceType.js.map

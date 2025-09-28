@@ -40,31 +40,47 @@ const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
 const helmet_1 = __importDefault(require("helmet"));
 const compression_1 = __importDefault(require("compression"));
-const express_rate_limit_1 = __importDefault(require("express-rate-limit"));
+// import rateLimit from 'express-rate-limit';
 const dotenv_1 = __importDefault(require("dotenv"));
 const mongoose_1 = __importDefault(require("mongoose"));
 // Import routes - Only analytics for Ojitha's responsibilities
 const analytics_routes_1 = __importDefault(require("./routes/analytics.routes"));
 const outlet_routes_1 = __importDefault(require("./routes/outlet.routes"));
+const customer_routes_1 = __importDefault(require("./routes/customer.routes"));
+const queue_routes_1 = __importDefault(require("./routes/queue.routes"));
+const services_routes_1 = __importDefault(require("./routes/services.routes"));
 // Import middleware
 const errorHandler_1 = require("./middleware/errorHandler");
 // Load environment variables
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 const PORT = process.env.PORT || 5000;
-// Rate limiting
-const limiter = (0, express_rate_limit_1.default)({
-    windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000'), // 15 minutes
-    max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100'), // limit each IP to 100 requests per windowMs
-    message: 'Too many requests from this IP, please try again later.'
-});
+// Rate limiting - More lenient for development (disabled for now)
+// const limiter = rateLimit({
+//   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '60000'),
+//   max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '1000'),
+//   message: {
+//     success: false,
+//     message: 'Too many requests from this IP, please try again later.',
+//     retryAfter: 60
+//   },
+//   standardHeaders: true,
+//   legacyHeaders: false,
+// });
 // Middleware
 app.use((0, helmet_1.default)());
 app.use((0, compression_1.default)());
-app.use(limiter);
+// app.use(limiter); // Disabled for development
 app.use((0, cors_1.default)({
-    origin: process.env.FRONTEND_URL || "http://localhost:3000",
-    credentials: true
+    origin: [
+        process.env.FRONTEND_URL || "http://localhost:3000",
+        "http://localhost:5173",
+        "http://localhost:5174",
+        "http://localhost:3000"
+    ],
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(express_1.default.json({ limit: '10mb' }));
 app.use(express_1.default.urlencoded({ extended: true, limit: '10mb' }));
@@ -103,6 +119,9 @@ app.post('/api/seed', async (_req, res) => {
 // API Routes - Only analytics and outlets for Ojitha's tasks
 app.use('/api/analytics', analytics_routes_1.default);
 app.use('/api/outlets', outlet_routes_1.default);
+app.use('/api/customer', customer_routes_1.default);
+app.use('/api/queue', queue_routes_1.default);
+app.use('/api/services', services_routes_1.default);
 // Error handling middleware (should be last)
 app.use(errorHandler_1.errorHandler);
 // 404 handler
@@ -112,19 +131,51 @@ app.use('*', (_req, res) => {
         message: 'Route not found'
     });
 });
-// Database connection
+// Database connection - Priority: MongoDB Atlas for real data
 const connectDB = async () => {
     try {
         const mongoURI = process.env.MONGODB_URI;
-        if (!mongoURI) {
-            throw new Error('MONGODB_URI is not defined in environment variables');
+        const localURI = process.env.MONGODB_LOCAL_URI || 'mongodb://localhost:27017/queueManagement';
+        console.log('🔗 Attempting to connect to MongoDB Atlas for real data...');
+        // PRIORITY: Try Atlas connection first for real data
+        if (mongoURI) {
+            try {
+                await mongoose_1.default.connect(mongoURI, {
+                    serverSelectionTimeoutMS: 15000, // Increased timeout for Atlas
+                    socketTimeoutMS: 45000,
+                    maxPoolSize: 10,
+                    retryWrites: true,
+                });
+                console.log('✅ Successfully connected to MongoDB Atlas (REAL DATA)');
+                console.log('📊 System will display real queue and analytics data');
+                return;
+            }
+            catch (atlasError) {
+                console.error('❌ MongoDB Atlas connection failed:', atlasError instanceof Error ? atlasError.message : atlasError);
+                console.log('🔄 Trying local MongoDB as fallback...');
+            }
         }
-        await mongoose_1.default.connect(mongoURI);
-        console.log('✅ Connected to MongoDB Atlas');
+        else {
+            console.error('❌ MONGODB_URI not found in environment variables');
+        }
+        // Fallback to local MongoDB
+        try {
+            await mongoose_1.default.connect(localURI, {
+                serverSelectionTimeoutMS: 5000,
+            });
+            console.log('✅ Connected to local MongoDB (fallback)');
+            console.log('⚠️  Using local database - may have limited data');
+        }
+        catch (localError) {
+            console.error('❌ All MongoDB connections failed');
+            console.error('Local error:', localError instanceof Error ? localError.message : localError);
+            console.log('🚨 Server starting WITHOUT database connection');
+            console.log('� APIs will return mock data only');
+            // Continue without exiting to allow API testing
+        }
     }
     catch (error) {
-        console.error('❌ MongoDB connection error:', error);
-        process.exit(1);
+        console.error('❌ Database connection setup error:', error);
     }
 };
 // Start server

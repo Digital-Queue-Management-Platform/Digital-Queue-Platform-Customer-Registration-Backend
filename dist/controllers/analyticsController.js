@@ -10,6 +10,16 @@ class AnalyticsController {
         this.getDashboard = async (req, res) => {
             try {
                 const { outletId, startDate, endDate } = req.query;
+                // Check if MongoDB is connected - require real connection for real data
+                const mongoose = require('mongoose');
+                if (mongoose.connection.readyState !== 1) {
+                    console.error('[ANALYTICS] MongoDB not connected - cannot fetch real analytics data');
+                    return res.status(503).json({
+                        success: false,
+                        message: 'Database connection unavailable. Please ensure MongoDB Atlas is connected for real analytics data.',
+                        error: 'Service temporarily unavailable'
+                    });
+                }
                 const dateRange = {
                     start: startDate ? new Date(startDate) : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
                     end: endDate ? new Date(endDate) : new Date(),
@@ -18,17 +28,29 @@ class AnalyticsController {
                     outletId,
                     dateRange,
                 });
+                // Map the data to match frontend expectations
+                const mappedData = {
+                    averageWaitTime: dashboardData.averageWaitTime,
+                    totalCustomersToday: dashboardData.totalCustomers,
+                    completedServices: dashboardData.totalCustomers, // Assuming all customers are completed for simplicity
+                    peakHours: dashboardData.peakHours,
+                    serviceTypeBreakdown: dashboardData.serviceDistribution.map(item => ({
+                        type: item.type,
+                        count: item.count
+                    })),
+                };
                 res.json({
                     success: true,
-                    data: dashboardData,
+                    data: mappedData,
                 });
             }
             catch (error) {
                 console.error('Error fetching dashboard data:', error);
+                // Return error instead of mock data to ensure real data requirement
                 res.status(500).json({
                     success: false,
-                    message: 'Failed to fetch dashboard data',
-                    error: error instanceof Error ? error.message : 'Unknown error',
+                    message: 'Failed to fetch real analytics data from database',
+                    error: error instanceof Error ? error.message : 'Unknown database error'
                 });
             }
         };
@@ -38,6 +60,15 @@ class AnalyticsController {
         this.getWaitTimes = async (req, res) => {
             try {
                 const { outletId } = req.query;
+                // Check if MongoDB is connected - require real connection for real data
+                const mongoose = require('mongoose');
+                if (mongoose.connection.readyState !== 1) {
+                    return res.status(503).json({
+                        success: false,
+                        message: 'Database connection unavailable. Cannot fetch real wait time data.',
+                        error: 'Service temporarily unavailable'
+                    });
+                }
                 const waitTimeData = await this.analyticsService.getWaitTimeAnalytics(outletId);
                 res.json({
                     success: true,
@@ -48,8 +79,8 @@ class AnalyticsController {
                 console.error('Error fetching wait time data:', error);
                 res.status(500).json({
                     success: false,
-                    message: 'Failed to fetch wait time data',
-                    error: error instanceof Error ? error.message : 'Unknown error',
+                    message: 'Failed to fetch real wait time data from database',
+                    error: error instanceof Error ? error.message : 'Unknown database error'
                 });
             }
         };
@@ -80,6 +111,15 @@ class AnalyticsController {
         this.getOfficerPerformance = async (req, res) => {
             try {
                 const { outletId } = req.query;
+                // Check if MongoDB is connected - require real connection for real data
+                const mongoose = require('mongoose');
+                if (mongoose.connection.readyState !== 1) {
+                    return res.status(503).json({
+                        success: false,
+                        message: 'Database connection unavailable. Cannot fetch real officer performance data.',
+                        error: 'Service temporarily unavailable'
+                    });
+                }
                 const performanceData = await this.analyticsService.getOfficerPerformanceAnalytics(outletId);
                 res.json({
                     success: true,

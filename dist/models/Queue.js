@@ -33,90 +33,55 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.Customer = void 0;
+exports.Queue = void 0;
 const mongoose_1 = __importStar(require("mongoose"));
-const customerSchema = new mongoose_1.Schema({
-    name: {
-        type: String,
-        required: true,
-        trim: true,
-    },
-    phoneNumber: {
-        type: String,
-        required: true,
-        trim: true,
-    },
-    email: {
-        type: String,
-        trim: true,
-        lowercase: true,
-    },
-    serviceType: {
-        type: String,
-        required: true,
-    },
-    priority: {
-        type: String,
-        enum: ['normal', 'vip', 'disabled', 'senior'],
-        default: 'normal',
-    },
-    tokenNumber: {
-        type: String,
-        required: true,
-        unique: true,
-    },
-    qrCode: {
-        type: String,
-    },
+const queueSchema = new mongoose_1.Schema({
     outletId: {
         type: String,
         required: true,
     },
-    status: {
-        type: String,
-        enum: ['waiting', 'being_served', 'completed', 'cancelled'],
-        default: 'waiting',
+    date: {
+        type: Date,
+        required: true,
+        default: () => {
+            const today = new Date();
+            return new Date(today.getFullYear(), today.getMonth(), today.getDate());
+        }
     },
-    registrationTime: {
+    currentlyServing: {
+        type: String,
+    },
+    totalServed: {
+        type: Number,
+        default: 0,
+    },
+    totalWaiting: {
+        type: Number,
+        default: 0,
+    },
+    averageWaitTime: {
+        type: Number,
+        default: 0,
+    },
+    peakHourData: [{
+            hour: {
+                type: Number,
+                min: 0,
+                max: 23,
+            },
+            count: {
+                type: Number,
+                default: 0,
+            }
+        }],
+    lastUpdated: {
         type: Date,
         default: Date.now,
-    },
-    queuePosition: {
-        type: Number,
-        required: true,
-    },
-    estimatedWaitTime: {
-        type: Number,
-        required: true,
-    },
-    actualWaitTime: {
-        type: Number,
-    },
-    serviceStartTime: {
-        type: Date,
-    },
-    serviceEndTime: {
-        type: Date,
-    },
-    assignedOfficerId: {
-        type: String,
-    },
-    feedback: {
-        rating: {
-            type: Number,
-            min: 1,
-            max: 5,
-        },
-        comment: String,
-        submittedAt: Date,
-    },
+    }
 }, {
     timestamps: true,
 });
-// Indexes for performance
-customerSchema.index({ outletId: 1, status: 1 });
-customerSchema.index({ tokenNumber: 1 });
-customerSchema.index({ registrationTime: 1 });
-customerSchema.index({ phoneNumber: 1 });
-exports.Customer = mongoose_1.default.model('Customer', customerSchema);
-//# sourceMappingURL=Customer.js.map
+// Compound index for outlet and date
+queueSchema.index({ outletId: 1, date: 1 }, { unique: true });
+exports.Queue = mongoose_1.default.model('Queue', queueSchema);
+//# sourceMappingURL=Queue.js.map
