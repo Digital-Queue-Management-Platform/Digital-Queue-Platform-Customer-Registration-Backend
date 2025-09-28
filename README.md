@@ -1,12 +1,19 @@
-# Digital Queue Management Platform - Analytics Backend
+# Digital Queue Management Platform - Backend API
 
 [![Node.js](https://img.shields.io/badge/Node.js-18+-green.svg)](https://nodejs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue.svg)](https://www.typescriptlang.org/)
 [![MongoDB](https://img.shields.io/badge/MongoDB-Atlas-green.svg)](https://www.mongodb.com/)
 [![Express.js](https://img.shields.io/badge/Express.js-4.18+-orange.svg)](https://expressjs.com/)
+[![Deployed](https://img.shields.io/badge/Deployed-Render-46E3B7.svg)](https://digital-queue-platform-customer.onrender.com)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-> **Advanced Analytics & Reporting Engine** for Digital Queue Management Platform  
+> **Production-Ready RESTful API** for Digital Queue Management Platform with Analytics & Real-time Processing
+
+## 🌐 Live Deployment
+
+**API Base URL**: [https://digital-queue-platform-customer.onrender.com](https://digital-queue-platform-customer.onrender.com)
+
+**Health Check**: [https://digital-queue-platform-customer.onrender.com/api/health](https://digital-queue-platform-customer.onrender.com/api/health)  
 
 ## Project Overview
 
