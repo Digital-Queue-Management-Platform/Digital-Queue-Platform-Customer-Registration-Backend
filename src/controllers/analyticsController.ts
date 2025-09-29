@@ -127,8 +127,11 @@ export class AnalyticsController {
         const hourlyData = [];
         
         // Generate data for business hours (9 AM to 5 PM)
+        const today = new Date();
         for (let hour = 9; hour <= 17; hour++) {
-          const timeString = `${hour.toString().padStart(2, '0')}:00`;
+          // Create proper datetime string for the chart
+          const timeDate = new Date(today.getFullYear(), today.getMonth(), today.getDate(), hour, 0, 0);
+          const timeString = timeDate.toISOString();
           let waitTime, queueLength;
           
           if (hour < currentHour) {
@@ -171,8 +174,10 @@ export class AnalyticsController {
       // Generate realistic fallback data
       const fallbackData = [];
       
+      const today = new Date();
       for (let hour = 9; hour <= 17; hour++) {
-        const timeString = `${hour.toString().padStart(2, '0')}:00`;
+        const timeDate = new Date(today.getFullYear(), today.getMonth(), today.getDate(), hour, 0, 0);
+        const timeString = timeDate.toISOString();
         const waitTime = hour >= 11 && hour <= 14 ? 
           Math.floor(Math.random() * 10) + 15 : 
           Math.floor(Math.random() * 8) + 5;
@@ -222,45 +227,12 @@ export class AnalyticsController {
       
       const performanceData = await this.analyticsService.getOfficerPerformanceAnalytics(outletId);
 
-      // If no data or empty data, generate realistic officer performance data
+      // If no data or empty data, return empty array since no officers exist in database
       if (!performanceData || performanceData.length === 0) {
-        const currentHour = new Date().getHours();
-        const isBusinessHours = currentHour >= 9 && currentHour <= 17;
-        
-        const officerData = [
-          { 
-            officerId: '1', 
-            name: 'Sarah M.', 
-            customersServed: isBusinessHours ? Math.floor(Math.random() * 5) + 8 : Math.floor(Math.random() * 15) + 15,
-            averageServiceTime: 8.5, 
-            efficiency: 95 
-          },
-          { 
-            officerId: '2', 
-            name: 'John D.', 
-            customersServed: isBusinessHours ? Math.floor(Math.random() * 4) + 6 : Math.floor(Math.random() * 12) + 12,
-            averageServiceTime: 9.2, 
-            efficiency: 88 
-          },
-          { 
-            officerId: '3', 
-            name: 'Lisa K.', 
-            customersServed: isBusinessHours ? Math.floor(Math.random() * 3) + 5 : Math.floor(Math.random() * 10) + 10,
-            averageServiceTime: 10.1, 
-            efficiency: 82 
-          },
-          { 
-            officerId: '4', 
-            name: 'Mike R.', 
-            customersServed: isBusinessHours ? Math.floor(Math.random() * 6) + 9 : Math.floor(Math.random() * 18) + 18,
-            averageServiceTime: 7.8, 
-            efficiency: 98 
-          },
-        ];
-
         return res.json({
           success: true,
-          data: officerData
+          data: [],
+          message: 'No officers found in database'
         });
       }
 
@@ -271,17 +243,11 @@ export class AnalyticsController {
     } catch (error) {
       console.error('Error fetching officer performance data:', error);
       
-      // Generate realistic fallback data
-      const fallbackData = [
-        { officerId: '1', name: 'Sarah M.', customersServed: 18, averageServiceTime: 8.5, efficiency: 95 },
-        { officerId: '2', name: 'John D.', customersServed: 15, averageServiceTime: 9.2, efficiency: 88 },
-        { officerId: '3', name: 'Lisa K.', customersServed: 12, averageServiceTime: 10.1, efficiency: 82 },
-        { officerId: '4', name: 'Mike R.', customersServed: 21, averageServiceTime: 7.8, efficiency: 98 },
-      ];
-
+      // Return empty data since no officers exist in database
       res.json({
         success: true,
-        data: fallbackData
+        data: [],
+        message: 'No officers found in database - error fallback'
       });
     }
   };
