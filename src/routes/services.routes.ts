@@ -1,5 +1,4 @@
 import { Router } from 'express';
-import { ServiceType } from '../models/ServiceType';
 
 const router = Router();
 
@@ -10,92 +9,80 @@ const router = Router();
  */
 router.get('/types', async (_req, res) => {
   try {
-    const serviceTypes = await ServiceType.find({ isActive: true })
-      .select('id name description estimatedDuration category isActive')
-      .sort({ name: 1 });
-
-    // If no service types exist, create default ones
-    if (serviceTypes.length === 0) {
-      const defaultServiceTypes = [
-        {
-          id: 'general-inquiry',
-          name: 'General Inquiry',
-          description: 'General questions and basic information',
-          estimatedDuration: 300,
-          category: 'Information',
-          isActive: true,
-          requirements: ['Valid ID']
-        },
-        {
-          id: 'account-services',
-          name: 'Account Services',
-          description: 'Account opening, closing, and modifications',
-          estimatedDuration: 900,
-          category: 'Banking',
-          isActive: true,
-          requirements: ['Valid ID', 'Proof of address', 'Initial deposit']
-        },
-        {
-          id: 'loan-applications',
-          name: 'Loan Applications',
-          description: 'New loan applications and loan inquiries',
-          estimatedDuration: 1800,
-          category: 'Lending',
-          isActive: true,
-          requirements: ['Valid ID', 'Income proof', 'Collateral documents']
-        },
-        {
-          id: 'card-services',
-          name: 'Card Services',
-          description: 'Credit/debit card issues and applications',
-          estimatedDuration: 600,
-          category: 'Cards',
-          isActive: true,
-          requirements: ['Valid ID', 'Proof of address']
-        },
-        {
-          id: 'money-transfer',
-          name: 'Money Transfer',
-          description: 'Domestic and international money transfers',
-          estimatedDuration: 480,
-          category: 'Transfers',
-          isActive: true,
-          requirements: ['Valid ID', 'Transfer details']
-        }
-      ];
-
-      await ServiceType.insertMany(defaultServiceTypes);
-      const newServiceTypes = await ServiceType.find({ isActive: true })
-        .select('id name description estimatedDuration category isActive')
-        .sort({ name: 1 });
-
-      // Transform data to match frontend expectations
-      const transformedNewTypes = newServiceTypes.map(service => ({
-        id: service.id,
-        name: service.name,
-        estimatedTime: Math.round(service.estimatedDuration / 60), // Convert seconds to minutes
-        category: service.category
-      }));
-
-      return res.json({
-        success: true,
-        data: transformedNewTypes,
-        totalCount: transformedNewTypes.length
-      });
-    }
-
-    // Transform data to match frontend expectations
-    const transformedTypes = serviceTypes.map(service => ({
-      id: service.id,
-      name: service.name,
-      estimatedTime: Math.round(service.estimatedDuration / 60), // Convert seconds to minutes
-      category: service.category
-    }));
+    // Always return our predefined telecommunication services
+    const defaultServiceTypes = [
+      {
+        id: 'bill-payments',
+        name: 'Bill Payments',
+        estimatedTime: 8,
+        category: 'Billing'
+      },
+      {
+        id: 'technical-support',
+        name: 'Technical Support & Troubleshooting',
+        estimatedTime: 15,
+        category: 'Support'
+      },
+      {
+        id: 'service-disconnections',
+        name: 'Service Disconnections/Reconnections',
+        estimatedTime: 12,
+        category: 'Service Management'
+      },
+      {
+        id: 'international-roaming',
+        name: 'International Roaming Services',
+        estimatedTime: 10,
+        category: 'International Services'
+      },
+      {
+        id: 'new-connections',
+        name: 'New Connections',
+        estimatedTime: 20,
+        category: 'Registration'
+      },
+      {
+        id: 'device-issues',
+        name: 'Device Issues/Repairs',
+        estimatedTime: 15,
+        category: 'Device Support'
+      },
+      {
+        id: 'complaint-resolution',
+        name: 'Complaint Resolution',
+        estimatedTime: 18,
+        category: 'Customer Service'
+      },
+      {
+        id: 'corporate-account',
+        name: 'Corporate Account Management',
+        estimatedTime: 25,
+        category: 'Corporate Services'
+      },
+      {
+        id: 'plan-changes',
+        name: 'Plan Changes/Upgrades',
+        estimatedTime: 9,
+        category: 'Plan Management'
+      },
+      {
+        id: 'account-management',
+        name: 'Account Management',
+        estimatedTime: 12,
+        category: 'Account Services'
+      },
+      {
+        id: 'document-submission',
+        name: 'Document Submission/Verification',
+        estimatedTime: 6,
+        category: 'Documentation'
+      }
+    ];
 
     res.json({
       success: true,
-      data: transformedTypes,
-      totalCount: transformedTypes.length
+      data: defaultServiceTypes,
+      totalCount: defaultServiceTypes.length
     });
   } catch (error) {
     console.error('Error fetching service types:', error);
