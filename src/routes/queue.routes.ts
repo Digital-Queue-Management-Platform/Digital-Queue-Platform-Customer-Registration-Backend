@@ -1,6 +1,7 @@
 import { Router } from 'express';
-import { Customer } from '../models/Customer';
-import { Queue } from '../models/Queue';
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
 
 const router = Router();
 
@@ -38,25 +39,8 @@ router.get('/outlet/:outletId', async (req, res) => {
   try {
     const { outletId } = req.params;
     
-    // Check if MongoDB is connected
-    const mongoose = require('mongoose');
-    if (mongoose.connection.readyState !== 1) {
-      // Return mock data when MongoDB is not connected
-      console.log('[QUEUE] MongoDB not connected, returning mock data');
-      
-      const mockData = {
-        outletId,
-        currentlyServing: 'T042',
-        totalWaiting: 8,
-        averageWaitTime: 12,
-        nextTokens: ['T043', 'T044', 'T045', 'T046', 'T047', 'T048', 'T049', 'T050'],
-      };
-
-      return res.json({
-        success: true,
-        data: mockData
-      });
-    }
+    // Get queue data using Prisma
+    console.log('[QUEUE] Fetching queue data from PostgreSQL for outlet:', outletId);
     
     // Get today's date range
     const today = new Date();
@@ -65,84 +49,70 @@ router.get('/outlet/:outletId', async (req, res) => {
     todayEnd.setDate(todayEnd.getDate() + 1);
     
     // Get waiting customers
-    const waitingCustomers = await Customer.find({
-      outletId,
-      status: 'waiting',
-      registrationTime: { $gte: todayStart, $lt: todayEnd }
-    }).sort({ queuePosition: 1 }).select('tokenNumber name serviceType estimatedWaitTime');
+    const waitingCustomers = await prisma.customer.findMany({
+      where: {
+        outletId,
+        status: 'WAITING',
+        registrationTime: { gte: todayStart, lt: todayEnd }
+      },
+      orderBy: { queuePosition: 'asc' },
+      select: { tokenNumber: true, name: true, serviceType: true, estimatedWaitTime: true }
+    });
     
     // Get currently serving customer
-    const servingCustomer = await Customer.findOne({
-      outletId,
-      status: 'being_served',
-      registrationTime: { $gte: todayStart, $lt: todayEnd }
-    }).select('tokenNumber');
+    const servingCustomer = await prisma.customer.findFirst({
+      where: {
+        outletId,
+        status: 'BEING_SERVED',
+        registrationTime: { gte: todayStart, lt: todayEnd }
+      },
+      select: { tokenNumber: true }
+    });
     
     // Get completed customers for analytics
-    const completedCustomers = await Customer.find({
-      outletId,
-      status: 'completed',
-      registrationTime: { $gte: todayStart, $lt: todayEnd }
-    }).select('actualWaitTime serviceStartTime serviceEndTime');
+    const completedCustomers = await prisma.customer.findMany({
+      where: {
+        outletId,
+        status: 'COMPLETED',
+        registrationTime: { gte: todayStart, lt: todayEnd }
+      },
+      select: { actualWaitTime: true, serviceStartTime: true, serviceEndTime: true }
+    });
     
     // Calculate average wait time
     let averageWaitTime = 0;
     if (completedCustomers.length > 0) {
-      const totalWaitTime = completedCustomers.reduce((sum, customer) => {
+      const totalWaitTime = completedCustomers.reduce((sum: number, customer: any) => {
         return sum + (customer.actualWaitTime || 0);
       }, 0);
-      averageWaitTime = Math.round(totalWaitTime / completedCustomers.length / 60); // convert to minutes
+      averageWaitTime = Math.round(totalWaitTime / completedCustomers.length); // already in minutes
     } else {
       // Default estimate if no completed customers today
       averageWaitTime = Math.max(waitingCustomers.length * 5, 5); // 5 minutes per customer, minimum 5
     }
     
     // Generate next tokens array (next 12 customers)
-    const nextTokens = waitingCustomers.slice(0, 12).map(customer => customer.tokenNumber);
-    
-    // Get or create queue record
-    let queueRecord = await Queue.findOne({ outletId, date: todayStart });
-    if (!queueRecord) {
-      queueRecord = new Queue({
-        outletId,
-        date: todayStart,
-        totalWaiting: waitingCustomers.length,
-        totalServed: completedCustomers.length,
-        averageWaitTime,
-        currentlyServing: servingCustomer?.tokenNumber
-      });
-      await queueRecord.save();
-    } else {
-      // Update queue record
-      queueRecord.totalWaiting = waitingCustomers.length;
-      queueRecord.totalServed = completedCustomers.length;
-      queueRecord.averageWaitTime = averageWaitTime;
-      queueRecord.currentlyServing = servingCustomer?.tokenNumber;
-      queueRecord.lastUpdated = new Date();
-      await queueRecord.save();
-    }
+    const nextTokens = waitingCustomers.slice(0, 12).map((customer: any) => customer.tokenNumber);
     
     // Get currently serving customer
-    let currentlyServing = '';
-    if (servingCustomer && typeof servingCustomer.tokenNumber === 'string' && servingCustomer.tokenNumber.length > 0) {
+    let currentlyServing = '--';
+    if (servingCustomer?.tokenNumber) {
       currentlyServing = servingCustomer.tokenNumber;
-    } else if (waitingCustomers.length > 0 && typeof waitingCustomers[0].tokenNumber === 'string' && waitingCustomers[0].tokenNumber.length > 0) {
+    } else if (waitingCustomers.length > 0) {
       currentlyServing = waitingCustomers[0].tokenNumber;
-    } else {
-      currentlyServing = '--';
     }
 
     console.log(`[QUEUE] Fetching outlet queue for ${outletId}`);
-    console.log(`[QUEUE] Waiting customers:`, waitingCustomers.map(c => c.tokenNumber));
+    console.log(`[QUEUE] Waiting customers:`, waitingCustomers.map((c: any) => c.tokenNumber));
     console.log(`[QUEUE] Currently serving:`, currentlyServing);
 
-    // Always return all required fields, even if empty
+    // Return response data
     const responseData = {
       outletId,
-      currentlyServing: typeof currentlyServing === 'string' && currentlyServing.length > 0 ? currentlyServing : '--',
-      totalWaiting: typeof waitingCustomers.length === 'number' ? waitingCustomers.length : 0,
-      averageWaitTime: typeof averageWaitTime === 'number' ? averageWaitTime : 0,
-      nextTokens: Array.isArray(nextTokens) ? nextTokens : [],
+      currentlyServing,
+      totalWaiting: waitingCustomers.length,
+      averageWaitTime,
+      nextTokens,
     };
 
     res.json({

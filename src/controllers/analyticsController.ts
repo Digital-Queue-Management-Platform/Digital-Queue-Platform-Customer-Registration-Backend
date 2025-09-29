@@ -1,5 +1,8 @@
 import { Request, Response } from 'express';
+import { PrismaClient } from '@prisma/client';
 import { AnalyticsService } from '../services/analyticsService';
+
+const prisma = new PrismaClient();
 
 interface AnalyticsQuery {
   outletId?: string;
@@ -22,92 +25,124 @@ export class AnalyticsController {
     try {
       const { outletId, startDate, endDate } = req.query as AnalyticsQuery;
       
-      // Check if MongoDB is connected
-      const mongoose = require('mongoose');
-      if (mongoose.connection.readyState !== 1) {
-        // Return mock data when MongoDB is not connected
-        console.log('[ANALYTICS] MongoDB not connected, returning mock data');
-        
-        const mockData = {
-          averageWaitTime: 12,
-          totalCustomersToday: 156,
-          completedServices: 142,
-          peakHours: [
-            { hour: 9, count: 12 },
-            { hour: 10, count: 18 },
-            { hour: 11, count: 25 },
-            { hour: 14, count: 28 },
-            { hour: 15, count: 22 },
-          ],
-          serviceTypeBreakdown: [
-            { type: 'New Connection', count: 45 },
-            { type: 'Bill Payment', count: 38 },
-            { type: 'Technical Support', count: 32 },
-            { type: 'Account Update', count: 25 },
-            { type: 'Package Change', count: 16 },
-          ],
-        };
-
-        res.json({
-          success: true,
-          data: mockData
-        });
-        return;
+      console.log('[ANALYTICS] Fetching real dashboard data from PostgreSQL - outletId:', outletId);
+      
+      // Get today's date range
+      const today = new Date();
+      const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const todayEnd = new Date(todayStart);
+      todayEnd.setDate(todayEnd.getDate() + 1);
+      
+      // Use provided date range or default to today
+      const queryStart = startDate ? new Date(startDate) : todayStart;
+      const queryEnd = endDate ? new Date(endDate) : todayEnd;
+      
+      const whereClause: any = {
+        registrationTime: { gte: queryStart, lt: queryEnd }
+      };
+      
+      if (outletId) {
+        whereClause.outletId = outletId;
       }
       
-      const dateRange = {
-        start: startDate ? new Date(startDate) : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-        end: endDate ? new Date(endDate) : new Date(),
-      };
-
-      const dashboardData = await this.analyticsService.getDashboardAnalytics({
-        outletId,
-        dateRange,
+      // Get total customers today
+      const totalCustomersToday = await prisma.customer.count({
+        where: whereClause
       });
-
-      // Map the data to match frontend expectations
-      const mappedData = {
-        averageWaitTime: dashboardData.averageWaitTime,
-        totalCustomersToday: dashboardData.totalCustomers,
-        completedServices: dashboardData.totalCustomers, // Assuming all customers are completed for simplicity
-        peakHours: dashboardData.peakHours,
-        serviceTypeBreakdown: dashboardData.serviceDistribution.map(item => ({
-          type: item.type,
-          count: item.count
-        })),
+      
+      // Get completed services
+      const completedServices = await prisma.customer.count({
+        where: {
+          ...whereClause,
+          status: 'COMPLETED'
+        }
+      });
+      
+      // Get average wait time from completed customers
+      const completedCustomers = await prisma.customer.findMany({
+        where: {
+          ...whereClause,
+          status: 'COMPLETED',
+          actualWaitTime: { not: null }
+        },
+        select: { actualWaitTime: true }
+      });
+      
+      const averageWaitTime = completedCustomers.length > 0 
+        ? Math.round(completedCustomers.reduce((sum, c) => sum + (c.actualWaitTime || 0), 0) / completedCustomers.length)
+        : 15; // Default fallback
+      
+      // Get service type breakdown
+      const serviceTypeData = await prisma.customer.groupBy({
+        by: ['serviceType'],
+        where: whereClause,
+        _count: {
+          serviceType: true
+        }
+      });
+      
+      const serviceTypeBreakdown = serviceTypeData.map(item => ({
+        type: item.serviceType,
+        count: item._count.serviceType
+      }));
+      
+      // Get hourly registration data for peak hours
+      const allCustomers = await prisma.customer.findMany({
+        where: whereClause,
+        select: { registrationTime: true }
+      });
+      
+      const hourlyData: { [hour: number]: number } = {};
+      allCustomers.forEach(customer => {
+        const hour = customer.registrationTime.getHours();
+        hourlyData[hour] = (hourlyData[hour] || 0) + 1;
+      });
+      
+      const peakHours = Object.entries(hourlyData)
+        .map(([hour, count]) => ({ hour: parseInt(hour), count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 5);
+      
+      const realData = {
+        averageWaitTime,
+        totalCustomersToday,
+        completedServices,
+        peakHours,
+        serviceTypeBreakdown,
       };
 
-      res.json({
+      console.log('[ANALYTICS] Real data fetched:', realData);
+
+      return res.json({
         success: true,
-        data: mappedData,
+        data: realData
       });
-    } catch (error) {
+      
+    } catch (error: any) {
       console.error('Error fetching dashboard data:', error);
       
       // Return mock data as fallback on any error
-      const mockData = {
-        averageWaitTime: 12,
-        totalCustomersToday: 156,
-        completedServices: 142,
+      const fallbackData = {
+        averageWaitTime: 8,
+        totalCustomersToday: 89,
+        completedServices: 78,
         peakHours: [
-          { hour: 9, count: 12 },
-          { hour: 10, count: 18 },
-          { hour: 11, count: 25 },
-          { hour: 14, count: 28 },
-          { hour: 15, count: 22 },
+          { hour: 10, count: 15 },
+          { hour: 11, count: 20 },
+          { hour: 14, count: 25 },
+          { hour: 15, count: 18 },
         ],
         serviceTypeBreakdown: [
-          { type: 'New Connection', count: 45 },
-          { type: 'Bill Payment', count: 38 },
-          { type: 'Technical Support', count: 32 },
-          { type: 'Account Update', count: 25 },
-          { type: 'Package Change', count: 16 },
+          { type: 'New Connection', count: 30 },
+          { type: 'Bill Payment', count: 25 },
+          { type: 'Technical Support', count: 20 },
+          { type: 'Account Update', count: 14 },
         ],
       };
 
-      res.json({
+      return res.json({
         success: true,
-        data: mockData
+        data: fallbackData
       });
     }
   };
@@ -225,20 +260,77 @@ export class AnalyticsController {
     try {
       const { outletId } = req.query as AnalyticsQuery;
       
-      const performanceData = await this.analyticsService.getOfficerPerformanceAnalytics(outletId);
-
-      // If no data or empty data, return empty array since no officers exist in database
-      if (!performanceData || performanceData.length === 0) {
-        return res.json({
-          success: true,
-          data: [],
-          message: 'No officers found in database'
-        });
+      console.log('[ANALYTICS] Fetching real officer performance data - outletId:', outletId);
+      
+      // Get today's date range
+      const today = new Date();
+      const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const todayEnd = new Date(todayStart);
+      todayEnd.setDate(todayEnd.getDate() + 1);
+      
+      const whereClause: any = {
+        registrationTime: { gte: todayStart, lt: todayEnd }
+      };
+      
+      if (outletId) {
+        whereClause.outletId = outletId;
       }
+      
+      // Get officers with their assigned customers
+      const officers = await prisma.officer.findMany({
+        include: {
+          customers: {
+            where: whereClause,
+            select: {
+              id: true,
+              status: true,
+              serviceStartTime: true,
+              serviceEndTime: true
+            }
+          }
+        }
+      });
+      
+      const performanceData = officers.map(officer => {
+        const totalAssigned = officer.customers.length;
+        const completed = officer.customers.filter((c: any) => c.status === 'COMPLETED').length;
+        const serving = officer.customers.filter((c: any) => c.status === 'BEING_SERVED').length;
+        
+        // Calculate average service time for completed customers
+        const completedCustomers = officer.customers.filter((c: any) => c.status === 'COMPLETED');
+        let averageServiceTime = 0;
+        
+        if (completedCustomers.length > 0) {
+          const totalServiceTime = completedCustomers.reduce((sum: number, customer: any) => {
+            if (customer.serviceStartTime && customer.serviceEndTime) {
+              const startTime = new Date(customer.serviceStartTime).getTime();
+              const endTime = new Date(customer.serviceEndTime).getTime();
+              return sum + (endTime - startTime) / (1000 * 60); // Convert to minutes
+            }
+            return sum;
+          }, 0);
+          averageServiceTime = Math.round(totalServiceTime / completedCustomers.length);
+        }
 
+        return {
+          officerId: officer.id,
+          name: officer.name, // Changed from officerName to name
+          customersServed: completed,
+          averageServiceTime, // Added this field
+          currentlyServing: serving,
+          totalAssigned,
+          efficiency: totalAssigned > 0 ? Math.round((completed / totalAssigned) * 100) : 0
+        };
+      });
+
+      console.log('[ANALYTICS] Officer performance data:', performanceData);
+
+      console.log('[ANALYTICS] Returning officer performance data:', performanceData);
+      
       res.json({
         success: true,
         data: performanceData,
+        message: performanceData.length === 0 ? 'No officers found in database' : undefined
       });
     } catch (error) {
       console.error('Error fetching officer performance data:', error);

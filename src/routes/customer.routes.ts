@@ -1,6 +1,7 @@
 import { Router } from 'express';
-import { Customer } from '../models/Customer';
-import { Queue } from '../models/Queue';
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
 
 const router = Router();
 
@@ -9,9 +10,11 @@ const generateTokenNumber = async (outletId: string): Promise<string> => {
   const today = new Date();
   const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   
-  const count = await Customer.countDocuments({
-    outletId,
-    registrationTime: { $gte: todayStart }
+  const count = await prisma.customer.count({
+    where: {
+      outletId,
+      registrationTime: { gte: todayStart }
+    }
   });
   
   return `T${(count + 1).toString().padStart(3, '0')}`;
@@ -24,13 +27,28 @@ const generateTokenNumber = async (outletId: string): Promise<string> => {
  */
 router.post('/register', async (req, res) => {
   try {
-    const { name, email, phoneNumber, serviceType, outletId } = req.body;
+    console.log('[REGISTER] Full request body:', JSON.stringify(req.body, null, 2));
+    
+    const { name, email, phoneNumber, telephoneNumber, mobileNumber, serviceType, outletId, nicPassport } = req.body;
+    
+    // Use phoneNumber or fallback to telephoneNumber/mobileNumber for compatibility
+    const customerPhone = phoneNumber || telephoneNumber || mobileNumber;
+    
+    console.log('[REGISTER] Extracted fields:', {
+      name, 
+      customerPhone,
+      serviceType, 
+      outletId,
+      email,
+      nicPassport
+    });
     
     // Validate required fields
-    if (!name || !phoneNumber || !serviceType || !outletId) {
+    if (!name || !customerPhone || !serviceType || !outletId) {
+      console.log('[REGISTER] Missing required fields:', { name: !!name, customerPhone: !!customerPhone, serviceType: !!serviceType, outletId: !!outletId });
       return res.status(400).json({
         success: false,
-        message: 'Missing required fields: name, phoneNumber, serviceType, outletId'
+        message: 'Missing required fields: name, phone number, serviceType, outletId'
       });
     }
 
@@ -41,10 +59,15 @@ router.post('/register', async (req, res) => {
     todayEnd.setDate(todayEnd.getDate() + 1);
 
     // Check for duplicate registrations today (same phone number)
-    const existingCustomer = await Customer.findOne({
-      phoneNumber: phoneNumber.trim(),
-      outletId,
-      registrationTime: { $gte: todayStart, $lt: todayEnd }
+    const existingCustomer = await prisma.customer.findFirst({
+      where: {
+        phoneNumber: customerPhone.trim(),
+        outletId,
+        registrationTime: { 
+          gte: todayStart, 
+          lt: todayEnd 
+        }
+      }
     });
 
     if (existingCustomer) {
@@ -63,46 +86,51 @@ router.post('/register', async (req, res) => {
     const tokenNumber = await generateTokenNumber(outletId);
     
     // Get current queue position
-    const currentPosition = await Customer.countDocuments({
-      outletId,
-      status: 'waiting'
+    const currentPosition = await prisma.customer.count({
+      where: {
+        outletId,
+        status: 'WAITING'
+      }
     }) + 1;
     
     // Estimate wait time (5 minutes per person ahead + service time)
-    const estimatedWaitTime = Math.max((currentPosition - 1) * 300 + 600, 300); // minimum 5 minutes
+    const estimatedWaitTime = Math.max((currentPosition - 1) * 5 + 10, 5); // minimum 5 minutes
     
     // Create new customer
-    const customer = new Customer({
+    console.log('[REGISTER] About to create customer with data:', {
       name: name.trim(),
-      phoneNumber: phoneNumber.trim(),
+      phoneNumber: customerPhone.trim(),
       email: email?.trim(),
       serviceType,
       outletId,
       tokenNumber,
       queuePosition: currentPosition,
       estimatedWaitTime,
-      status: 'waiting',
-      registrationTime: new Date()
+      status: 'WAITING',
+      priority: 'NORMAL'
     });
     
-    await customer.save();
+    const customer = await prisma.customer.create({
+      data: {
+        name: name.trim(),
+        phoneNumber: customerPhone.trim(),
+        email: email?.trim(),
+        serviceType,
+        outletId,
+        tokenNumber,
+        queuePosition: currentPosition,
+        estimatedWaitTime,
+        status: 'WAITING',
+        priority: 'NORMAL',
+        qrCode: `QR_${tokenNumber}_${Date.now()}`
+      }
+    });
     
-    // Update queue statistics
-    const queueUpdateDate = new Date();
-    const queueTodayStart = new Date(queueUpdateDate.getFullYear(), queueUpdateDate.getMonth(), queueUpdateDate.getDate());
-    
-    await Queue.findOneAndUpdate(
-      { outletId, date: queueTodayStart },
-      { 
-        $inc: { totalWaiting: 1 },
-        $set: { lastUpdated: new Date() }
-      },
-      { upsert: true, new: true }
-    );
 
+    
     // Return customer data in expected format
     const responseData = {
-      id: customer._id.toString(),
+      id: customer.id,
       name: customer.name,
       phoneNumber: customer.phoneNumber,
       email: customer.email,
@@ -112,7 +140,8 @@ router.post('/register', async (req, res) => {
       queuePosition: customer.queuePosition,
       estimatedWaitTime: customer.estimatedWaitTime,
       status: customer.status,
-      createdAt: customer.registrationTime.toISOString()
+      createdAt: customer.registrationTime.toISOString(),
+      qrCode: customer.qrCode
     };
 
     console.log(`[REGISTER] New customer registration:`, { name, phoneNumber, serviceType, outletId });

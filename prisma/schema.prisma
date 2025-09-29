@@ -1,0 +1,192 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+
+
+// ============================================================================
+// MONGODB-SPECIFIC NOTES:
+// ============================================================================
+// When using MongoDB, you may want to:
+// 1. Change provider to "mongodb" 
+// 2. Add @map("_id") @db.ObjectId to id fields if you want to use ObjectId
+// 3. Use @@map("collection_name") to customize collection names
+// 
+// Example for MongoDB ObjectId pattern:
+// model User {
+//   id    String @id @default(auto()) @map("_id") @db.ObjectId
+//   email String @unique
+//   // ... other fields
+// }
+
+// ============================================================================
+// POSTGRESQL-SPECIFIC NOTES:
+// ============================================================================
+// When using PostgreSQL, you can:
+// 1. Use auto-incrementing integers: @id @default(autoincrement())
+// 2. Use UUIDs: @id @default(uuid())
+// 3. Take advantage of advanced PostgreSQL features like arrays, JSON, etc.
+//
+// Example for PostgreSQL with integer IDs:
+// model User {
+//   id    Int    @id @default(autoincrement())
+//   email String @unique
+//   // ... other fields
+// }
+
+// ============================================================================
+// QUEUE MANAGEMENT SPECIFIC MODELS (Based on existing Mongoose models)
+// ============================================================================
+
+model Customer {
+  id                String         @id @default(cuid())
+  name              String
+  phoneNumber       String
+  email             String?
+  serviceType       String
+  priority          CustomerPriority @default(NORMAL)
+  tokenNumber       String         @unique
+  qrCode            String?
+  outletId          String
+  status            CustomerStatus @default(WAITING)
+  registrationTime  DateTime       @default(now())
+  queuePosition     Int
+  estimatedWaitTime Int           // in minutes
+  actualWaitTime    Int?          // in minutes
+  serviceStartTime  DateTime?
+  serviceEndTime    DateTime?
+  assignedOfficerId String?
+  
+  // Feedback as JSON field (works in both PostgreSQL and MongoDB)
+  feedback          Json?
+  
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  
+  // Relations
+  outlet            Outlet         @relation(fields: [outletId], references: [id])
+  assignedOfficer   Officer?       @relation(fields: [assignedOfficerId], references: [id])
+  
+  @@index([phoneNumber])
+  @@index([email])
+  @@index([tokenNumber])
+  @@index([status])
+  @@index([outletId])
+  @@index([registrationTime])
+}
+
+model ServiceType {
+  id                String   @id @default(cuid())
+  serviceId         String   @unique
+  name              String
+  description       String
+  estimatedDuration Int      // in seconds
+  category          String
+  isActive          Boolean  @default(true)
+  
+  // Requirements as JSON array (works in both databases)
+  requirements      Json?
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  // Relations
+  queues            Queue[]
+  
+  @@index([name])
+  @@index([category])
+  @@index([isActive])
+}
+
+model Officer {
+  id          String   @id @default(cuid())
+  employeeId  String   @unique
+  name        String
+  email       String   @unique
+  department  String
+  isActive    Boolean  @default(true)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  customers   Customer[]
+  
+  @@index([employeeId])
+  @@index([email])
+  @@index([department])
+}
+
+model Outlet {
+  id          String   @id @default(cuid())
+  name        String
+  address     String
+  city        String
+  state       String
+  zipCode     String
+  phone       String?
+  email       String?
+  isActive    Boolean  @default(true)
+  
+  // Operating hours as JSON (flexible for both databases)
+  operatingHours Json?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  customers   Customer[]
+  queues      Queue[]
+  
+  @@index([city])
+  @@index([state])
+  @@index([isActive])
+}
+
+model Queue {
+  id              String      @id @default(cuid())
+  name            String
+  outletId        String
+  serviceTypeId   String
+  currentNumber   Int         @default(0)
+  isActive        Boolean     @default(true)
+  maxCapacity     Int?
+  avgServiceTime  Int?        // in minutes
+  
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  
+  // Relations
+  outlet          Outlet      @relation(fields: [outletId], references: [id])
+  serviceType     ServiceType @relation(fields: [serviceTypeId], references: [id])
+  
+  @@index([outletId])
+  @@index([serviceTypeId])
+  @@index([isActive])
+}
+
+// ============================================================================
+// ENUMS
+// ============================================================================
+
+enum CustomerPriority {
+  NORMAL
+  VIP
+  DISABLED
+  SENIOR
+}
+
+enum CustomerStatus {
+  WAITING
+  BEING_SERVED
+  COMPLETED
+  CANCELLED
+}
