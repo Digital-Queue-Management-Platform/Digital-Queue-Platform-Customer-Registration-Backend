@@ -18,49 +18,103 @@ router.get('/types', async (_req, res) => {
     if (serviceTypes.length === 0) {
       const defaultServiceTypes = [
         {
-          id: 'general-inquiry',
-          name: 'General Inquiry',
-          description: 'General questions and basic information',
-          estimatedDuration: 300,
-          category: 'Information',
+          id: 'bill-payments',
+          name: 'Bill Payments',
+          description: 'Handle customer bill payments and inquiries',
+          estimatedDuration: 480, // 8 minutes
+          category: 'Billing',
           isActive: true,
-          requirements: ['Valid ID']
+          requirements: ['Valid ID', 'Account number']
         },
         {
-          id: 'account-services',
-          name: 'Account Services',
-          description: 'Account opening, closing, and modifications',
-          estimatedDuration: 900,
-          category: 'Banking',
+          id: 'technical-support',
+          name: 'Technical Support & Troubleshooting',
+          description: 'Resolve technical issues',
+          estimatedDuration: 900, // 15 minutes
+          category: 'Support',
           isActive: true,
-          requirements: ['Valid ID', 'Proof of address', 'Initial deposit']
+          requirements: ['Valid ID', 'Device information']
         },
         {
-          id: 'loan-applications',
-          name: 'Loan Applications',
-          description: 'New loan applications and loan inquiries',
-          estimatedDuration: 1800,
-          category: 'Lending',
+          id: 'service-disconnections',
+          name: 'Service Disconnections/Reconnections',
+          description: 'Process service changes',
+          estimatedDuration: 720, // 12 minutes
+          category: 'Service Management',
           isActive: true,
-          requirements: ['Valid ID', 'Income proof', 'Collateral documents']
+          requirements: ['Valid ID', 'Account verification']
         },
         {
-          id: 'card-services',
-          name: 'Card Services',
-          description: 'Credit/debit card issues and applications',
-          estimatedDuration: 600,
-          category: 'Cards',
+          id: 'international-roaming',
+          name: 'International Roaming Services',
+          description: 'Setup and manage roaming services',
+          estimatedDuration: 600, // 10 minutes
+          category: 'International Services',
           isActive: true,
-          requirements: ['Valid ID', 'Proof of address']
+          requirements: ['Valid ID', 'Passport', 'Travel details']
         },
         {
-          id: 'money-transfer',
-          name: 'Money Transfer',
-          description: 'Domestic and international money transfers',
-          estimatedDuration: 480,
-          category: 'Transfers',
+          id: 'new-connections',
+          name: 'New Connections',
+          description: 'Mobile/fixed line/broadband registration',
+          estimatedDuration: 1200, // 20 minutes
+          category: 'Registration',
           isActive: true,
-          requirements: ['Valid ID', 'Transfer details']
+          requirements: ['Valid ID', 'Proof of address', 'Initial payment']
+        },
+        {
+          id: 'device-issues',
+          name: 'Device Issues/Repairs',
+          description: 'Handle device-related problems and repairs',
+          estimatedDuration: 900, // 15 minutes
+          category: 'Device Support',
+          isActive: true,
+          requirements: ['Valid ID', 'Device', 'Purchase receipt']
+        },
+        {
+          id: 'complaint-resolution',
+          name: 'Complaint Resolution',
+          description: 'Handle and resolve customer complaints',
+          estimatedDuration: 1080, // 18 minutes
+          category: 'Customer Service',
+          isActive: true,
+          requirements: ['Valid ID', 'Complaint reference']
+        },
+        {
+          id: 'corporate-account',
+          name: 'Corporate Account Management',
+          description: 'Handle business accounts',
+          estimatedDuration: 1500, // 25 minutes
+          category: 'Corporate Services',
+          isActive: true,
+          requirements: ['Valid ID', 'Business registration', 'Authorization letter']
+        },
+        {
+          id: 'plan-changes',
+          name: 'Plan Changes/Upgrades',
+          description: 'Help customers change or upgrade their plans',
+          estimatedDuration: 540, // 9 minutes
+          category: 'Plan Management',
+          isActive: true,
+          requirements: ['Valid ID', 'Current plan details']
+        },
+        {
+          id: 'account-management',
+          name: 'Account Management',
+          description: 'Address changes, name transfers, etc.',
+          estimatedDuration: 720, // 12 minutes
+          category: 'Account Services',
+          isActive: true,
+          requirements: ['Valid ID', 'Proof of new details']
+        },
+        {
+          id: 'document-submission',
+          name: 'Document Submission/Verification',
+          description: 'Process customer documents',
+          estimatedDuration: 360, // 6 minutes
+          category: 'Documentation',
+          isActive: true,
+          requirements: ['Valid ID', 'Required documents']
         }
       ];
 
